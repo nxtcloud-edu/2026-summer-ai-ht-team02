@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.models.location import EvacuationStatus
+from app.models.alert import Alert, AlertType, SOSResponse
 from app.services.alert import create_sos_alert
 
 
@@ -65,3 +66,59 @@ def get_nearby_peers(
 
     nearby.sort(key=lambda p: p["distance"])
     return nearby
+
+
+def respond_to_sos(alert_id: int, responder_id: int, message: str = None, db: Session = None) -> dict:
+    """SOS에 대한 응답 기록 — 동료가 도움 가겠다고 표시"""
+    alert = (
+        db.query(Alert)
+        .filter(Alert.id == alert_id, Alert.alert_type == AlertType.SOS, Alert.is_resolved == False)
+        .first()
+    )
+    if not alert:
+        return None
+
+    # 이미 응답했는지 확인
+    existing = (
+        db.query(SOSResponse)
+        .filter(SOSResponse.alert_id == alert_id, SOSResponse.responder_id == responder_id)
+        .first()
+    )
+    if existing:
+        return None
+
+    response = SOSResponse(alert_id=alert_id, responder_id=responder_id, message=message)
+    db.add(response)
+    db.commit()
+    db.refresh(response)
+
+    return {
+        "alert_id": alert_id,
+        "responder_id": responder_id,
+        "sender_id": alert.source_user_id,
+        "message": message,
+        "responded_at": str(response.responded_at),
+    }
+
+
+def get_active_sos(db: Session) -> List[dict]:
+    """현재 미해결된 SOS 알림 목록 + 응답자 정보"""
+    alerts = (
+        db.query(Alert)
+        .filter(Alert.alert_type == AlertType.SOS, Alert.is_resolved == False)
+        .all()
+    )
+    result = []
+    for a in alerts:
+        responders = db.query(SOSResponse).filter(SOSResponse.alert_id == a.id).all()
+        result.append({
+            "alert_id": a.id,
+            "sender_id": a.source_user_id,
+            "floor_id": a.floor_id,
+            "x": a.x,
+            "y": a.y,
+            "message": a.message,
+            "created_at": str(a.created_at),
+            "responders": [r.responder_id for r in responders],
+        })
+    return result

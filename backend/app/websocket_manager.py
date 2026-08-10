@@ -73,6 +73,31 @@ class ConnectionManager:
         await self.broadcast_to_admins(message)
         await self.broadcast_to_rescuers(message)
 
+    async def send_to_floor_workers(self, floor_id: int, exclude_user_id: int, message: dict):
+        """같은 층 근로자에게만 메시지 전송 (발신자 제외)"""
+        from app.models.database import SessionLocal
+        from app.models.location import EvacuationStatus
+
+        db = SessionLocal()
+        try:
+            floor_workers = (
+                db.query(EvacuationStatus)
+                .filter(
+                    EvacuationStatus.last_floor_id == floor_id,
+                    EvacuationStatus.user_id != exclude_user_id,
+                )
+                .all()
+            )
+            target_ids = {w.user_id for w in floor_workers}
+        finally:
+            db.close()
+
+        for uid in target_ids:
+            if uid in self.worker_connections:
+                ws = self.active_connections.get(uid)
+                if ws:
+                    await ws.send_json(message)
+
 
 # 싱글톤 인스턴스 — 라우터에서 import 가능
 manager = ConnectionManager()
