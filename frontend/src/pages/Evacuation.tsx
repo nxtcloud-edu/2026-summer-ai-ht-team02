@@ -13,7 +13,7 @@ interface RouteInfo {
 }
 
 export default function Evacuation() {
-  const [floorId, setFloorId] = useState<number>(1);
+  const [floorId, setFloorId] = useState<number | null>(null);
   const [nodes, setNodes] = useState<NodeData[]>([]);
   const [edges, setEdges] = useState<EdgeData[]>([]);
   const [route, setRoute] = useState<RouteInfo | null>(null);
@@ -24,11 +24,38 @@ export default function Evacuation() {
   const { userId, role } = getStoredAuth();
   const parsedUserId = userId ? parseInt(userId, 10) : 0;
 
-  // 현재 위치 (간단히 임시 좌표 — 실제로는 useGeolocation 연동)
-  const [currentPos] = useState({ x: 100, y: 100 });
+  // 현재 위치 (서버에서 가져옴)
+  const [currentPos, setCurrentPos] = useState({ x: 0, y: 0 });
+
+  // 현재 유저 위치 로드
+  useEffect(() => {
+    async function loadMyLocation() {
+      try {
+        const res = await api.get(`/api/locations/current/${parsedUserId}`);
+        const data = res.data;
+        if (data.floor_id) setFloorId(data.floor_id);
+        if (data.x != null && data.y != null) setCurrentPos({ x: data.x, y: data.y });
+      } catch {
+        // 위치 정보 없으면 첫 번째 층 로드 시도
+        loadDefaultFloor();
+      }
+    }
+    async function loadDefaultFloor() {
+      try {
+        const bRes = await api.get("/api/buildings/");
+        if (bRes.data.length > 0) {
+          const fRes = await api.get(`/api/buildings/${bRes.data[0].id}/floors`);
+          const f1 = fRes.data.find((f: { floor_number: number }) => f.floor_number === 1) || fRes.data[0];
+          if (f1) setFloorId(f1.id);
+        }
+      } catch { /* ignore */ }
+    }
+    if (parsedUserId) loadMyLocation();
+  }, [parsedUserId]);
 
   // 노드/엣지 로드
   useEffect(() => {
+    if (!floorId) return;
     async function loadGraph() {
       try {
         const [nodesRes, edgesRes] = await Promise.all([
@@ -67,6 +94,7 @@ export default function Evacuation() {
 
   // 탈출 경로 계산
   const calculateRoute = useCallback(async () => {
+    if (!floorId || (currentPos.x === 0 && currentPos.y === 0)) return;
     setLoading(true);
     try {
       const res = await api.post("/api/evacuation/route", {
@@ -159,13 +187,13 @@ export default function Evacuation() {
         <div className="bg-white rounded-lg shadow p-4 lg:col-span-2">
           <h2 className="text-lg font-semibold mb-4">나의 탈출 경로</h2>
           <FloorCanvas
-            width={800}
-            height={600}
+            width={30000}
+            height={12800}
             nodes={nodes}
             edges={edges}
             routePath={route?.path || []}
             fireZones={fireZones}
-            workers={[{ user_id: parsedUserId, x: currentPos.x, y: currentPos.y }]}
+            workers={currentPos.x !== 0 || currentPos.y !== 0 ? [{ user_id: parsedUserId, x: currentPos.x, y: currentPos.y }] : []}
           />
         </div>
 
@@ -232,7 +260,7 @@ export default function Evacuation() {
             <input
               type="number"
               min={1}
-              value={floorId}
+              value={floorId ?? ""}
               onChange={(e) => setFloorId(Number(e.target.value))}
               className="w-full px-3 py-2 border rounded text-sm"
               placeholder="층 ID"

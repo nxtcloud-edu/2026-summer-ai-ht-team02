@@ -51,3 +51,18 @@ class FloorEdge(Base):
     to_node_id = Column(Integer, nullable=False)
     distance = Column(Float)            # 거리 (가중치)
     is_blocked = Column(Integer, default=0)  # 0: 통행가능, 1: 차단(화재 등)
+
+
+class FloorAnchor(Base):
+    """도면 기준점 — GPS 좌표 ↔ 도면 px 좌표 매핑용 (최소 2개 필요)"""
+    __tablename__ = "floor_anchors"
+
+    id = Column(Integer, primary_key=True, index=True)
+    floor_id = Column(Integer, nullable=False)
+    # 도면 좌표 (px)
+    px_x = Column(Float, nullable=False)
+    px_y = Column(Float, nullable=False)
+    # GPS 좌표
+    gps_lat = Column(Float, nullable=False)
+    gps_lng = Column(Float, nullable=False)
+    label = Column(String)              # "출입구A", "비상구B" 등

@@ -15,6 +15,7 @@ from app.services.location import (
     get_location_history,
 )
 from app.services.alert import create_unconscious_alert
+from app.services.coordinate import gps_to_floor, has_anchors
 from app.models.location import EvacuationStatus
 from app.websocket_manager import manager
 from app.config import settings
@@ -78,12 +79,21 @@ async def update_location(
     - user_id는 JWT 토큰에서 자동 추출
     - 위치 이력 저장 + 대피 상태 업데이트
     - WebSocket으로 관리자/구조대에게 실시간 브로드캐스트
+    - GPS 좌표 → 도면 좌표 자동 변환 (앵커 등록 시)
     """
+    # GPS → 도면 좌표 변환 (앵커가 2개 이상 등록된 경우)
+    store_x = data.x
+    store_y = data.y
+    if has_anchors(data.floor_id, db):
+        converted = gps_to_floor(lat=data.y, lng=data.x, floor_id=data.floor_id, db=db)
+        if converted:
+            store_x, store_y = converted
+
     result = update_worker_location(
         user_id=current_user.id,
         floor_id=data.floor_id,
-        x=data.x,
-        y=data.y,
+        x=store_x,
+        y=store_y,
         accuracy=data.accuracy,
         heart_rate=data.heart_rate,
         db=db,
@@ -93,8 +103,8 @@ async def update_location(
     await manager.broadcast_location_update(
         user_id=current_user.id,
         floor_id=data.floor_id,
-        x=data.x,
-        y=data.y,
+        x=store_x,
+        y=store_y,
     )
 
     # 심박 이상 감지: 임계값 이하이면 즉시 의식불명 판정

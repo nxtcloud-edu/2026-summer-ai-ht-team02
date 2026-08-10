@@ -63,16 +63,14 @@ function getNodeColor(nodeType: string): string {
   }
 }
 
-function getNodeRadius(nodeType: string): number {
-  switch (nodeType) {
-    case "exit":
-      return 8;
-    case "stair":
-    case "elevator":
-      return 7;
-    default:
-      return 5;
-  }
+/**
+ * 노드 반경 — viewBox에 비례하여 계산
+ * width에 기반한 상대 크기 반환 (기본 800px → 30000mm 스케일 대응)
+ */
+function getNodeRadius(nodeType: string, viewWidth: number): number {
+  const scale = viewWidth / 800;
+  const base = nodeType === "exit" ? 8 : nodeType === "stair" || nodeType === "elevator" ? 7 : 5;
+  return base * scale;
 }
 
 // --- Component ---
@@ -103,6 +101,9 @@ export default function FloorCanvas({
     return routePath.map((n) => `${n.x},${n.y}`).join(" ");
   }, [routePath]);
 
+  // viewBox 크기에 따른 스케일 팩터
+  const scale = width / 800;
+
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
@@ -112,7 +113,7 @@ export default function FloorCanvas({
       {/* Layer 1: 도면 배경 이미지 */}
       {floorPlanUrl && (
         <image
-          href={floorPlanUrl}
+          href={floorPlanUrl.startsWith("http") ? floorPlanUrl : `http://localhost:8000${floorPlanUrl}`}
           x={0}
           y={0}
           width={width}
@@ -136,8 +137,8 @@ export default function FloorCanvas({
             x2={to.x}
             y2={to.y}
             stroke={edge.is_blocked ? "#ef4444" : "#d1d5db"}
-            strokeWidth={edge.is_blocked ? 2 : 1.5}
-            strokeDasharray={edge.is_blocked ? "6,3" : undefined}
+            strokeWidth={edge.is_blocked ? 3 * scale : 2 * scale}
+            strokeDasharray={edge.is_blocked ? `${12 * scale},${6 * scale}` : undefined}
             opacity={0.8}
           />
         );
@@ -149,11 +150,11 @@ export default function FloorCanvas({
           key={`fire-${idx}`}
           cx={zone.x}
           cy={zone.y}
-          r={zone.radius}
+          r={zone.radius * scale}
           fill="rgba(239, 68, 68, 0.2)"
           stroke="#ef4444"
-          strokeWidth={2}
-          strokeDasharray="4,2"
+          strokeWidth={3 * scale}
+          strokeDasharray={`${8 * scale},${4 * scale}`}
         >
           <animate
             attributeName="opacity"
@@ -170,16 +171,17 @@ export default function FloorCanvas({
           points={routePoints}
           fill="none"
           stroke="#22c55e"
-          strokeWidth={4}
+          strokeWidth={6 * scale}
           strokeLinecap="round"
           strokeLinejoin="round"
           opacity={0.8}
+          strokeDasharray={`${20 * scale},${10 * scale}`}
         >
           <animate
             attributeName="stroke-dashoffset"
-            from="20"
+            from={`${40 * scale}`}
             to="0"
-            dur="1s"
+            dur="1.5s"
             repeatCount="indefinite"
           />
         </polyline>
@@ -195,17 +197,17 @@ export default function FloorCanvas({
           <circle
             cx={node.x}
             cy={node.y}
-            r={getNodeRadius(node.node_type)}
+            r={getNodeRadius(node.node_type, width)}
             fill={getNodeColor(node.node_type)}
             stroke="#fff"
-            strokeWidth={1.5}
+            strokeWidth={2 * scale}
           />
           {node.label && (
             <text
               x={node.x}
-              y={node.y - 12}
+              y={node.y - 16 * scale}
               textAnchor="middle"
-              fontSize={10}
+              fontSize={12 * scale}
               fill="#374151"
               fontWeight={500}
             >
@@ -221,13 +223,13 @@ export default function FloorCanvas({
           <circle
             cx={worker.x}
             cy={worker.y}
-            r={10}
+            r={14 * scale}
             fill="rgba(59, 130, 246, 0.2)"
             stroke="none"
           >
             <animate
               attributeName="r"
-              values="8;12;8"
+              values={`${10 * scale};${18 * scale};${10 * scale}`}
               dur="2s"
               repeatCount="indefinite"
             />
@@ -235,10 +237,10 @@ export default function FloorCanvas({
           <circle
             cx={worker.x}
             cy={worker.y}
-            r={5}
+            r={7 * scale}
             fill={worker.status === "unconscious" ? "#ef4444" : "#3b82f6"}
             stroke="#fff"
-            strokeWidth={1.5}
+            strokeWidth={2 * scale}
           />
         </g>
       ))}
@@ -249,7 +251,7 @@ export default function FloorCanvas({
           x={width / 2}
           y={height / 2}
           textAnchor="middle"
-          fontSize={14}
+          fontSize={14 * scale}
           fill="#9ca3af"
         >
           도면 데이터를 불러오는 중...
