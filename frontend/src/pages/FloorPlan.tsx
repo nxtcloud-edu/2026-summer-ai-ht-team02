@@ -54,7 +54,7 @@ export default function FloorPlan() {
     loadBuildings();
   }, []);
 
-  // 층 목록 로드
+  // 층 목록 로드 — F1(1층)을 기본 선택
   useEffect(() => {
     if (!selectedBuilding) return;
     async function loadFloors() {
@@ -62,7 +62,8 @@ export default function FloorPlan() {
         const res = await api.get(`/api/buildings/${selectedBuilding}/floors`);
         setFloors(res.data);
         if (res.data.length > 0) {
-          setSelectedFloor(res.data[0]);
+          const f1 = res.data.find((f: Floor) => f.floor_number === 1);
+          setSelectedFloor(f1 || res.data[0]);
         }
       } catch {
         setFloors([]);

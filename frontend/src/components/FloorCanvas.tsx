@@ -206,9 +206,9 @@ export default function FloorCanvas({
           {node.label && (
             <text
               x={node.x}
-              y={node.y - 16 * scale}
+              y={node.y - getNodeRadius(node.node_type, width) - 4 * scale}
               textAnchor="middle"
-              fontSize={12 * scale}
+              fontSize={Math.min(10 * scale, 200)}
               fill="#374151"
               fontWeight={500}
             >

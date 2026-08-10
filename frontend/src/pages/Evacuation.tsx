@@ -13,7 +13,7 @@ interface RouteInfo {
 }
 
 export default function Evacuation() {
-  const [floorId, setFloorId] = useState<number | null>(null);
+  const [floorId, setFloorId] = useState<number | null>(1);
   const [nodes, setNodes] = useState<NodeData[]>([]);
   const [edges, setEdges] = useState<EdgeData[]>([]);
   const [route, setRoute] = useState<RouteInfo | null>(null);

@@ -36,22 +36,60 @@ interface AnomalyUser {
   latest_temp: number | null;
 }
 
+// --- 더미 데이터 (서버 연결 불가 시 fallback) ---
+function generateDummyHistory(): HealthHistoryItem[] {
+  const now = Date.now();
+  return Array.from({ length: 30 }, (_, i) => {
+    const baseHr = 72 + Math.sin(i * 0.3) * 8 + (Math.random() - 0.5) * 4;
+    const baseTemp = 36.5 + Math.sin(i * 0.2) * 0.3 + (Math.random() - 0.5) * 0.2;
+    return {
+      id: i + 1,
+      heart_rate: Math.round(baseHr),
+      temperature: parseFloat(baseTemp.toFixed(1)),
+      timestamp: new Date(now - (30 - i) * 30000).toISOString(),
+    };
+  });
+}
+
+const DUMMY_WORKERS = [
+  { id: 1, name: "김철수" },
+  { id: 2, name: "이영희" },
+  { id: 3, name: "박민수" },
+  { id: 4, name: "정소연" },
+  { id: 5, name: "최동현" },
+];
+
+const DUMMY_BASELINE: Baseline = {
+  avg_hr: 74,
+  std_hr: 6,
+  avg_temp: 36.5,
+  std_temp: 0.3,
+  sample_count: 120,
+  anomaly_count: 0,
+};
+
+const DUMMY_ANOMALY_USERS: AnomalyUser[] = [
+  { user_id: 3, anomaly_count: 4, avg_hr: 112, latest_hr: 118, latest_temp: 37.8 },
+];
+
 export default function HealthMonitor() {
-  const [workers, setWorkers] = useState<Array<{ id: number; name: string }>>([]);
-  const [selectedUser, setSelectedUser] = useState<number | null>(null);
-  const [history, setHistory] = useState<HealthHistoryItem[]>([]);
-  const [baseline, setBaseline] = useState<Baseline | null>(null);
-  const [anomalyUsers, setAnomalyUsers] = useState<AnomalyUser[]>([]);
+  const [workers, setWorkers] = useState<Array<{ id: number; name: string }>>(DUMMY_WORKERS);
+  const [selectedUser, setSelectedUser] = useState<number | null>(DUMMY_WORKERS[0].id);
+  const [history, setHistory] = useState<HealthHistoryItem[]>(generateDummyHistory());
+  const [baseline, setBaseline] = useState<Baseline | null>(DUMMY_BASELINE);
+  const [anomalyUsers, setAnomalyUsers] = useState<AnomalyUser[]>(DUMMY_ANOMALY_USERS);
 
   // 근로자 목록 로드
   useEffect(() => {
     async function loadWorkers() {
       try {
         const res = await api.get("/api/auth/workers");
-        setWorkers(res.data.map((w: { id: number; name: string }) => ({ id: w.id, name: w.name })));
-        if (res.data.length > 0) setSelectedUser(res.data[0].id);
+        if (res.data && res.data.length > 0) {
+          setWorkers(res.data.map((w: { id: number; name: string }) => ({ id: w.id, name: w.name })));
+          setSelectedUser(res.data[0].id);
+        }
       } catch {
-        // 권한 없으면 무시
+        // API 실패 시 더미 데이터 유지
       }
     }
     loadWorkers();
@@ -62,8 +100,10 @@ export default function HealthMonitor() {
     async function loadAnomalies() {
       try {
         const res = await api.get("/api/health/anomalies");
-        setAnomalyUsers(res.data);
-      } catch { /* ignore */ }
+        if (res.data && res.data.length > 0) {
+          setAnomalyUsers(res.data);
+        }
+      } catch { /* 더미 데이터 유지 */ }
     }
     loadAnomalies();
     const interval = setInterval(loadAnomalies, 15000);
@@ -79,11 +119,17 @@ export default function HealthMonitor() {
           api.get(`/api/health/history/${selectedUser}?limit=60`),
           api.get(`/api/health/baseline/${selectedUser}`).catch(() => ({ data: null })),
         ]);
-        setHistory(histRes.data.reverse()); // 시간순 정렬
-        setBaseline(baseRes.data);
+        if (histRes.data && histRes.data.length > 0) {
+          setHistory(histRes.data.reverse()); // 시간순 정렬
+          setBaseline(baseRes.data);
+        } else {
+          // 서버에 데이터 없으면 더미 사용
+          setHistory(generateDummyHistory());
+          setBaseline(DUMMY_BASELINE);
+        }
       } catch {
-        setHistory([]);
-        setBaseline(null);
+        setHistory(generateDummyHistory());
+        setBaseline(DUMMY_BASELINE);
       }
     }
     loadData();
