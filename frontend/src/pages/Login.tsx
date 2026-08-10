@@ -88,7 +88,8 @@ export default function Login({ onLoginSuccess }: LoginProps) {
           <div className="text-xs text-gray-500 space-y-1">
             <p><span className="font-medium">관리자:</span> admin@fire.io / demo1234</p>
             <p><span className="font-medium">구조대:</span> rescuer@fire.io / demo1234</p>
-            <p><span className="font-medium">근로자:</span> worker1@fire.io / demo1234</p>
+            <p><span className="font-medium">근로자1:</span> worker1@fire.io / demo1234</p>
+            <p><span className="font-medium">근로자2:</span> worker2@fire.io / demo1234</p>
           </div>
         </div>
       </div>

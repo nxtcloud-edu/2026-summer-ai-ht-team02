@@ -5,6 +5,7 @@ import FloorPlan from './pages/FloorPlan'
 import Evacuation from './pages/Evacuation'
 import RescuerView from './pages/RescuerView'
 import NavigationPage from './pages/NavigationPage'
+import PeerMap from './pages/PeerMap'
 import Login from './pages/Login'
 import HealthMonitor from './pages/HealthMonitor'
 import { getStoredAuth } from './hooks/useApi'
@@ -68,6 +69,14 @@ function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: (
               >
                 건강
               </NavLink>
+              <NavLink
+                to="/peers"
+                className={({ isActive }) =>
+                  `px-3 py-1 rounded text-sm ${isActive ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`
+                }
+              >
+                동료 위치
+              </NavLink>
             </nav>
             <div className="flex items-center gap-2 ml-4 pl-4 border-l">
               <span className="text-xs text-gray-500">{role}</span>
@@ -125,6 +134,7 @@ function AppRoutes() {
         <Route path="/navigate" element={<NavigationPage />} />
         <Route path="/rescuer" element={<RescuerView />} />
         <Route path="/health-monitor" element={<HealthMonitor />} />
+        <Route path="/peers" element={<PeerMap />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

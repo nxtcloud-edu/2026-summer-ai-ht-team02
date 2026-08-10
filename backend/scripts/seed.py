@@ -52,7 +52,7 @@ def seed():
         # ============================================================
         # 유저 등록
         # ============================================================
-        print("[2/8] 유저 등록 (admin 1, rescuer 1, worker 5)...")
+        print("[2/8] 유저 등록 (admin 1, rescuer 1, worker 6)...")
         pw = hash_password("demo1234")
 
         users = [
@@ -63,6 +63,7 @@ def seed():
             User(email="worker3@fire.io", hashed_password=pw, name="정도현", role=UserRole.WORKER, department="서버팀", floor_id=2),
             User(email="worker4@fire.io", hashed_password=pw, name="이수진", role=UserRole.WORKER, department="기획팀", floor_id=2),
             User(email="worker5@fire.io", hashed_password=pw, name="한동우", role=UserRole.WORKER, department="교육팀", floor_id=3),
+            User(email="worker6@fire.io", hashed_password=pw, name="송하영", role=UserRole.WORKER, department="마케팅팀", floor_id=1),
         ]
         db.add_all(users)
         db.flush()

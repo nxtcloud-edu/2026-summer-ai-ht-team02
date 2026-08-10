@@ -41,12 +41,14 @@ def get_nearby_peers(
     radius: float = 30.0,
     db: Session = None,
 ) -> List[dict]:
-    """반경 내 동료 목록"""
+    """반경 내 동료 목록 (위험 상태 포함)"""
+    from app.models.user import User
+
     workers = (
         db.query(EvacuationStatus)
         .filter(EvacuationStatus.last_floor_id == floor_id)
         .filter(EvacuationStatus.user_id != user_id)
-        .filter(EvacuationStatus.status.in_(["in_building", "evacuating"]))
+        .filter(EvacuationStatus.status.in_(["in_building", "evacuating", "unconscious"]))
         .all()
     )
 
@@ -56,12 +58,17 @@ def get_nearby_peers(
             continue
         dist = ((w.last_x - x) ** 2 + (w.last_y - y) ** 2) ** 0.5
         if dist <= radius:
+            user = db.query(User).filter(User.id == w.user_id).first()
             nearby.append({
                 "user_id": w.user_id,
+                "name": user.name if user else None,
                 "x": w.last_x,
                 "y": w.last_y,
                 "distance": round(dist, 1),
                 "status": w.status,
+                "heart_rate": w.heart_rate,
+                "is_moving": w.is_moving,
+                "sos_sent": w.sos_sent,
             })
 
     nearby.sort(key=lambda p: p["distance"])
