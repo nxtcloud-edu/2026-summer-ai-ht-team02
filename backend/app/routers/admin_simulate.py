@@ -159,3 +159,21 @@ async def simulate_health(
         "message": f"User {user_id} → health data recorded (hr={hr}, temp={temp})",
         "result": result,
     }
+
+
+@router.post("/checkin/{user_id}")
+async def simulate_checkin(user_id: int, check_type: str = "in", db: Session = Depends(get_db)):
+    """데모용: 출퇴근 강제 기록
+
+    Query params:
+        check_type: "in" 또는 "out" (기본값: "in")
+    """
+    from app.services.attendance import manual_check
+
+    if check_type not in ("in", "out"):
+        raise HTTPException(status_code=400, detail="check_type은 'in' 또는 'out'이어야 합니다.")
+
+    result = manual_check(user_id=user_id, check_type=check_type, db=db)
+    result["method"] = "admin"
+    return {"success": True, "message": f"User {user_id} → check_{check_type} (admin)", "result": result}
+
