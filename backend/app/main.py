@@ -1,6 +1,8 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import json
+import os
 
 from app.models.database import Base, engine
 from app.websocket_manager import manager
@@ -37,6 +39,11 @@ app.include_router(locations_router)
 app.include_router(alerts_router)
 app.include_router(evacuation_router)
 app.include_router(peers_router)
+
+# Static files (도면 이미지 서빙)
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
 # --- WebSocket Endpoints ---
