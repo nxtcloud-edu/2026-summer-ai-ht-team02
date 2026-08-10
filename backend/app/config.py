@@ -3,24 +3,19 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # Database
-    DATABASE_URL: str = "sqlite:///./site_planning.db"
+    DATABASE_URL: str = "sqlite:///./fire_escape.db"
 
     # Auth
     SECRET_KEY: str = "change-me-in-production"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
-    # 3-Tier Security
-    TIER1_PRIVATE: bool = True       # 기업 Raw Data 접근 제한
-    TIER2_SEMANTIC: bool = True      # 비식별·추상화 계층
-    TIER3_PLANNING: bool = True      # LLM/Agent 분석 계층
+    # WebSocket
+    WS_HEARTBEAT_INTERVAL: int = 5  # seconds
 
-    # OpenAI
-    OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o"
-
-    # External APIs (공공데이터)
-    PUBLIC_DATA_API_KEY: str = ""
+    # Evacuation
+    FIRE_ALERT_COOLDOWN: int = 10  # 중복 알림 방지 (초)
+    ROUTE_RECALCULATE_INTERVAL: int = 3  # 경로 재계산 주기 (초)
 
     class Config:
         env_file = ".env"
