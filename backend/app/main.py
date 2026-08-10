@@ -15,6 +15,7 @@ from app.routers import (
     evacuation_router,
     peers_router,
     admin_simulate_router,
+    health_router,
 )
 
 # Create tables
@@ -42,6 +43,7 @@ app.include_router(alerts_router)
 app.include_router(evacuation_router)
 app.include_router(peers_router)
 app.include_router(admin_simulate_router)
+app.include_router(health_router)
 
 # Static files (도면 이미지 서빙)
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")

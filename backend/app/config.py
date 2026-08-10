@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     UNCONSCIOUS_CHECK_INTERVAL: int = 10    # 백그라운드 체크 주기 (초)
     HEARTRATE_THRESHOLD_LOW: int = 40       # 심박 이상 하한선 (bpm)
 
+    # Health Monitoring (Z-score)
+    HEALTH_EMA_ALPHA: float = 0.05          # EMA 가중치
+    HEALTH_BASELINE_MIN_SAMPLES: int = 50   # baseline 초기화 최소 샘플
+    HEALTH_HR_ZSCORE_THRESHOLD: float = 2.0 # 심박 이상 임계 z-score
+    HEALTH_TEMP_ZSCORE_THRESHOLD: float = 1.5  # 체온 이상 임계 z-score
+    HEALTH_TEMP_ABSOLUTE_MAX: float = 38.0  # 체온 절대 임계값 (°C)
+    HEALTH_HR_ABSOLUTE_MIN: int = 40        # 심박 절대 위험값 (bpm)
+    HEALTH_ANOMALY_CONSECUTIVE: int = 3     # 연속 이상 → 상태 전환
+
     class Config:
         env_file = ".env"
 
