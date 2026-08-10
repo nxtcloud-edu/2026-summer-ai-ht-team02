@@ -26,6 +26,7 @@ export interface WorkerMarker {
   y: number;
   status?: string;
   is_moving?: boolean;
+  worker_state?: string; // normal, confused, delayed, at_risk, rescue_needed
 }
 
 export interface FireZone {
@@ -217,33 +218,46 @@ export default function FloorCanvas({
         </g>
       ))}
 
-      {/* Layer 6: 근로자 위치 마커 */}
-      {workers.map((worker) => (
-        <g key={`worker-${worker.user_id}`}>
-          <circle
-            cx={worker.x}
-            cy={worker.y}
-            r={14 * scale}
-            fill="rgba(59, 130, 246, 0.2)"
-            stroke="none"
-          >
-            <animate
-              attributeName="r"
-              values={`${10 * scale};${18 * scale};${10 * scale}`}
-              dur="2s"
-              repeatCount="indefinite"
-            />
-          </circle>
-          <circle
-            cx={worker.x}
-            cy={worker.y}
-            r={7 * scale}
-            fill={worker.status === "unconscious" ? "#ef4444" : "#3b82f6"}
-            stroke="#fff"
-            strokeWidth={2 * scale}
-          />
-        </g>
-      ))}
+      {/* Layer 6: 근로자 위치 마커 (상태별 색상) */}
+      {workers.map((worker) => {
+        const markerColor = getWorkerStateColor(worker.worker_state || worker.status);
+        const isRescueNeeded = worker.worker_state === "rescue_needed";
+        return (
+          <g key={`worker-${worker.user_id}`}>
+            <circle
+              cx={worker.x}
+              cy={worker.y}
+              r={14 * scale}
+              fill={markerColor + "33"}
+              stroke="none"
+            >
+              <animate
+                attributeName="r"
+                values={`${10 * scale};${18 * scale};${10 * scale}`}
+                dur={isRescueNeeded ? "0.8s" : "2s"}
+                repeatCount="indefinite"
+              />
+            </circle>
+            <circle
+              cx={worker.x}
+              cy={worker.y}
+              r={7 * scale}
+              fill={markerColor}
+              stroke="#fff"
+              strokeWidth={2 * scale}
+            >
+              {isRescueNeeded && (
+                <animate
+                  attributeName="opacity"
+                  values="1;0.3;1"
+                  dur="0.6s"
+                  repeatCount="indefinite"
+                />
+              )}
+            </circle>
+          </g>
+        );
+      })}
 
       {/* 데이터 없을 때 안내 */}
       {nodes.length === 0 && !floorPlanUrl && (
@@ -259,4 +273,24 @@ export default function FloorCanvas({
       )}
     </svg>
   );
+}
+
+// --- Worker State Color ---
+
+function getWorkerStateColor(state?: string): string {
+  switch (state) {
+    case "normal":
+      return "#3b82f6"; // blue
+    case "confused":
+      return "#eab308"; // yellow
+    case "delayed":
+      return "#f97316"; // orange
+    case "at_risk":
+      return "#ef4444"; // red
+    case "rescue_needed":
+    case "unconscious":
+      return "#dc2626"; // darker red
+    default:
+      return "#3b82f6"; // blue (default)
+  }
 }

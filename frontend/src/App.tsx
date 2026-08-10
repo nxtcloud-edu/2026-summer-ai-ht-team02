@@ -6,6 +6,7 @@ import Evacuation from './pages/Evacuation'
 import RescuerView from './pages/RescuerView'
 import NavigationPage from './pages/NavigationPage'
 import Login from './pages/Login'
+import HealthMonitor from './pages/HealthMonitor'
 import { getStoredAuth } from './hooks/useApi'
 
 function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: () => void }) {
@@ -58,6 +59,14 @@ function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: (
                 }
               >
                 구조대
+              </NavLink>
+              <NavLink
+                to="/health-monitor"
+                className={({ isActive }) =>
+                  `px-3 py-1 rounded text-sm ${isActive ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`
+                }
+              >
+                건강
               </NavLink>
             </nav>
             <div className="flex items-center gap-2 ml-4 pl-4 border-l">
@@ -115,6 +124,7 @@ function AppRoutes() {
         <Route path="/evacuation" element={<Evacuation />} />
         <Route path="/navigate" element={<NavigationPage />} />
         <Route path="/rescuer" element={<RescuerView />} />
+        <Route path="/health-monitor" element={<HealthMonitor />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

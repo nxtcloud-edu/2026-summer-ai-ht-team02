@@ -7,6 +7,14 @@ interface DashboardStats {
   evacuating: number;
   unconscious: number;
   activeAlerts: number;
+  healthAnomalies: number;
+  workerStates: {
+    normal: number;
+    confused: number;
+    delayed: number;
+    at_risk: number;
+    rescue_needed: number;
+  };
 }
 
 interface AlertFeedItem {
@@ -23,6 +31,8 @@ export default function Dashboard() {
     evacuating: 0,
     unconscious: 0,
     activeAlerts: 0,
+    healthAnomalies: 0,
+    workerStates: { normal: 0, confused: 0, delayed: 0, at_risk: 0, rescue_needed: 0 },
   });
   const [alertFeed, setAlertFeed] = useState<AlertFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,21 +43,31 @@ export default function Dashboard() {
   // 대시보드 데이터 로드
   const fetchStats = useCallback(async () => {
     try {
-      const [evacuationRes, unconsciousRes, alertsRes] = await Promise.all([
+      const [evacuationRes, unconsciousRes, alertsRes, healthRes] = await Promise.all([
         api.get("/api/evacuation/status"),
         api.get("/api/evacuation/unconscious"),
         api.get("/api/alerts/active"),
+        api.get("/api/health/anomalies").catch(() => ({ data: [] })),
       ]);
 
-      const evacuationData = evacuationRes.data as Array<{ status: string }>;
+      const evacuationData = evacuationRes.data as Array<{ status: string; worker_state?: string }>;
       const inBuilding = evacuationData.filter((s) => s.status === "in_building").length;
       const evacuating = evacuationData.filter((s) => s.status === "evacuating").length;
+
+      // worker_state 카운트
+      const workerStates = { normal: 0, confused: 0, delayed: 0, at_risk: 0, rescue_needed: 0 };
+      for (const s of evacuationData) {
+        const state = (s.worker_state || "normal") as keyof typeof workerStates;
+        if (state in workerStates) workerStates[state]++;
+      }
 
       setStats({
         inBuilding,
         evacuating,
         unconscious: (unconsciousRes.data as Array<unknown>).length,
         activeAlerts: (alertsRes.data as Array<unknown>).length,
+        healthAnomalies: (healthRes.data as Array<unknown>).length,
+        workerStates,
       });
       setError(null);
     } catch (err) {
@@ -92,7 +112,7 @@ export default function Dashboard() {
 
   // WebSocket 실시간 알림 수신
   const handleWSMessage = useCallback((msg: WSMessage) => {
-    if (msg.type === "fire_alert" || msg.type === "sos_alert" || msg.type === "peer_sos") {
+    if (msg.type === "fire_alert" || msg.type === "sos_alert" || msg.type === "peer_sos" || msg.type === "health_anomaly") {
       const newAlert: AlertFeedItem = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         type: msg.type as string,
@@ -103,20 +123,26 @@ export default function Dashboard() {
 
       setAlertFeed((prev) => [newAlert, ...prev].slice(0, 20));
 
-      // 통계도 즉시 갱신
       if (msg.type === "fire_alert") {
         setStats((prev) => ({ ...prev, activeAlerts: prev.activeAlerts + 1 }));
       }
+      if (msg.type === "health_anomaly") {
+        setStats((prev) => ({ ...prev, healthAnomalies: prev.healthAnomalies + 1 }));
+      }
     }
 
-    // 대피 완료 시 카운터 업데이트
+    if (msg.type === "worker_state_change") {
+      // 상태 카운트 즉시 반영
+      fetchStats();
+    }
+
     if (msg.type === "evacuation_complete") {
       setStats((prev) => ({
         ...prev,
         inBuilding: Math.max(0, prev.inBuilding - 1),
       }));
     }
-  }, []);
+  }, [fetchStats]);
 
   // WebSocket 연결 (userId가 있을 때만)
   const parsedUserId = userId ? parseInt(userId, 10) : 0;
@@ -148,7 +174,7 @@ export default function Dashboard() {
       )}
 
       {/* 상태 요약 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
           <p className="text-sm text-gray-500">재실 인원</p>
           <p className="text-2xl font-bold">
@@ -172,6 +198,34 @@ export default function Dashboard() {
           <p className="text-2xl font-bold">
             {loading ? "..." : stats.activeAlerts}
           </p>
+        </div>
+      </div>
+
+      {/* 작업자 상태 + 건강 이상 카드 */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-blue-400">
+          <p className="text-xs text-gray-500">정상</p>
+          <p className="text-xl font-bold text-blue-600">{loading ? "..." : stats.workerStates.normal}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-yellow-400">
+          <p className="text-xs text-gray-500">혼란</p>
+          <p className="text-xl font-bold text-yellow-600">{loading ? "..." : stats.workerStates.confused}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-orange-400">
+          <p className="text-xs text-gray-500">지연</p>
+          <p className="text-xl font-bold text-orange-600">{loading ? "..." : stats.workerStates.delayed}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-red-400">
+          <p className="text-xs text-gray-500">위험</p>
+          <p className="text-xl font-bold text-red-600">{loading ? "..." : stats.workerStates.at_risk}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-red-700">
+          <p className="text-xs text-gray-500">구조필요</p>
+          <p className="text-xl font-bold text-red-800">{loading ? "..." : stats.workerStates.rescue_needed}</p>
+        </div>
+        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-pink-500">
+          <p className="text-xs text-gray-500">건강 이상</p>
+          <p className="text-xl font-bold text-pink-600">{loading ? "..." : stats.healthAnomalies}</p>
         </div>
       </div>
 
@@ -307,6 +361,8 @@ function getAlertIcon(type: string): string {
       return "🤝";
     case "unconscious":
       return "⚠️";
+    case "health_anomaly":
+      return "💓";
     default:
       return "🔔";
   }
@@ -323,6 +379,8 @@ function getAlertBgColor(type: string): string {
       return "bg-orange-50";
     case "unconscious":
       return "bg-yellow-50";
+    case "health_anomaly":
+      return "bg-pink-50";
     default:
       return "bg-gray-50";
   }
@@ -336,6 +394,8 @@ function getAlertLabel(type: string): string {
       return "SOS 도움 요청";
     case "peer_sos":
       return "동료 SOS";
+    case "health_anomaly":
+      return "건강 이상 감지";
     default:
       return "알림";
   }

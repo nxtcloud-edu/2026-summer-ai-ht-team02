@@ -49,6 +49,11 @@ def update_worker_location(
         db.add(evac_status)
 
     db.commit()
+    
+    # 출퇴근 자동 감지 (gate 반경 내 진입 시)
+    from app.services.attendance import auto_check_by_location
+    auto_check_by_location(user_id, floor_id, x, y, db)
+    
     return {"user_id": user_id, "floor_id": floor_id, "x": x, "y": y}
 
 
