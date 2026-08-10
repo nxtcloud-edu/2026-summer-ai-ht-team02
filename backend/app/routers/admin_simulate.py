@@ -119,3 +119,43 @@ async def simulate_heartrate(user_id: int, bpm: int = 30, db: Session = Depends(
     await manager.broadcast_to_admins(msg)
 
     return {"success": True, "message": f"User {user_id} → heartrate {bpm}bpm → unconscious"}
+
+
+@router.post("/health/{user_id}")
+async def simulate_health(
+    user_id: int,
+    hr: int = 130,
+    temp: float = 39.2,
+    db: Session = Depends(get_db),
+):
+    """데모용: 건강 데이터 시뮬레이션 (이상치 투입)
+
+    Query params:
+        hr: 심박수 (기본값: 130)
+        temp: 체온 (기본값: 39.2)
+    """
+    from app.services.health_monitor import record_and_check
+
+    result = record_and_check(user_id=user_id, heart_rate=hr, temperature=temp, db=db)
+
+    # 이상 감지 시 WebSocket push
+    if result.get("anomaly_detected"):
+        msg = {
+            "type": "health_anomaly",
+            "user_id": user_id,
+            "anomaly_type": result.get("anomaly_type"),
+            "value": result.get("value"),
+            "baseline_avg": result.get("baseline_avg"),
+            "z_score": result.get("z_score"),
+            "consecutive_count": result.get("consecutive_count"),
+            "action": result.get("action"),
+            "source": "admin_simulate",
+        }
+        await manager.broadcast_to_admins(msg)
+        await manager.broadcast_to_rescuers(msg)
+
+    return {
+        "success": True,
+        "message": f"User {user_id} → health data recorded (hr={hr}, temp={temp})",
+        "result": result,
+    }
