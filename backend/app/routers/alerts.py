@@ -10,6 +10,7 @@ from app.services.alert import (
     get_active_alerts as svc_get_active,
     resolve_alert as svc_resolve,
 )
+from app.websocket_manager import manager
 
 router = APIRouter(prefix="/api/alerts", tags=["alerts"])
 
@@ -50,12 +51,12 @@ class AlertResponse(BaseModel):
 # --- Endpoints ---
 
 @router.post("/fire", response_model=FireAlertResponse, status_code=201)
-def trigger_fire_alert(data: FireAlertCreate, db: Session = Depends(get_db)):
+async def trigger_fire_alert(data: FireAlertCreate, db: Session = Depends(get_db)):
     """
-    화재 알림 발생 → 해당 반경 엣지 자동 차단 + 알림 생성
+    화재 알림 발생 → 해당 반경 엣지 자동 차단 + 알림 생성 + WebSocket 전체 broadcast
 
     - 화재 위치(x, y) 주변 반경 50px 내 노드가 포함된 엣지를 자동 차단
-    - 전체 근로자에게 화재 알림 전송 (WebSocket은 별도)
+    - WebSocket으로 전체 연결 클라이언트에게 화재 알림 실시간 전파
     """
     result = create_fire_alert(
         floor_id=data.floor_id,
@@ -64,6 +65,16 @@ def trigger_fire_alert(data: FireAlertCreate, db: Session = Depends(get_db)):
         message=data.message,
         db=db,
     )
+
+    # WebSocket 전체 broadcast
+    await manager.broadcast_all({
+        "type": "fire_alert",
+        "alert_id": result["alert_id"],
+        "floor_id": data.floor_id,
+        "x": data.x,
+        "y": data.y,
+        "message": result["message"],
+    })
 
     return FireAlertResponse(
         alert_id=result["alert_id"],
