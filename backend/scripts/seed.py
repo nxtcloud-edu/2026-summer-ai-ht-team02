@@ -327,6 +327,54 @@ def seed():
         db.commit()
 
         # ============================================================
+        # Gate 노드 추가 (출퇴근 자동 인식용)
+        # ============================================================
+        print("[추가] Gate 노드 등록 (1F 출입구)...")
+        gate_nodes = [
+            FloorNode(floor_id=f_1f.id, x=4000, y=12800, node_type="gate", label="정문 게이트"),
+            FloorNode(floor_id=f_1f.id, x=16000, y=0, node_type="gate", label="후문 게이트"),
+        ]
+        db.add_all(gate_nodes)
+        db.commit()
+
+        # ============================================================
+        # 건강 Baseline 초기 데이터 (유저당 50개)
+        # ============================================================
+        print("[추가] 건강 baseline 초기 데이터 생성...")
+        import random
+        from app.models.health_data import HealthRecord, HealthBaseline
+
+        for user_idx in [2, 3, 4, 5, 6]:  # worker 5명
+            user = users[user_idx]
+            hr_values = []
+            temp_values = []
+            for i in range(50):
+                hr = random.randint(62, 82)
+                temp = round(random.uniform(36.2, 36.8), 1)
+                hr_values.append(hr)
+                temp_values.append(temp)
+                db.add(HealthRecord(user_id=user.id, heart_rate=hr, temperature=temp))
+
+            # Baseline 계산
+            import statistics
+            avg_hr = statistics.mean(hr_values)
+            std_hr = statistics.stdev(hr_values)
+            avg_temp = statistics.mean(temp_values)
+            std_temp = statistics.stdev(temp_values)
+            db.add(HealthBaseline(
+                user_id=user.id,
+                avg_hr=avg_hr,
+                std_hr=std_hr,
+                avg_temp=avg_temp,
+                std_temp=std_temp,
+                sample_count=50,
+                anomaly_count=0,
+            ))
+
+        db.commit()
+        print(f"  → 5명 × 50개 = 250개 건강 기록 + baseline 생성 완료")
+
+        # ============================================================
         # 결과 출력
         # ============================================================
         print("\n" + "=" * 50)
