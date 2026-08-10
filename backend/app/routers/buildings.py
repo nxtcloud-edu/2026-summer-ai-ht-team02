@@ -6,7 +6,7 @@ import os
 import uuid
 
 from app.models.database import get_db
-from app.models.building import Building, Floor, FloorNode, FloorEdge
+from app.models.building import Building, Floor, FloorNode, FloorEdge, FloorAnchor
 
 router = APIRouter(prefix="/api/buildings", tags=["buildings"])
 
@@ -285,3 +285,83 @@ def unblock_edge(edge_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(edge)
     return edge
+
+
+# --- Anchors (GPS ↔ 도면 좌표 매핑 기준점) ---
+
+class AnchorCreate(BaseModel):
+    px_x: float
+    px_y: float
+    gps_lat: float
+    gps_lng: float
+    label: Optional[str] = None
+
+
+class AnchorResponse(BaseModel):
+    id: int
+    floor_id: int
+    px_x: float
+    px_y: float
+    gps_lat: float
+    gps_lng: float
+    label: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/floors/{floor_id}/anchors", response_model=List[AnchorResponse])
+def list_anchors(floor_id: int, db: Session = Depends(get_db)):
+    """층의 좌표 변환 기준점(앵커) 목록"""
+    return db.query(FloorAnchor).filter(FloorAnchor.floor_id == floor_id).all()
+
+
+@router.post("/floors/{floor_id}/anchors", response_model=AnchorResponse, status_code=201)
+def create_anchor(floor_id: int, data: AnchorCreate, db: Session = Depends(get_db)):
+    """좌표 변환 기준점 추가 (최소 2개 필요)"""
+    floor = db.query(Floor).filter(Floor.id == floor_id).first()
+    if not floor:
+        raise HTTPException(status_code=404, detail="층을 찾을 수 없습니다.")
+
+    anchor = FloorAnchor(
+        floor_id=floor_id,
+        px_x=data.px_x,
+        px_y=data.px_y,
+        gps_lat=data.gps_lat,
+        gps_lng=data.gps_lng,
+        label=data.label,
+    )
+    db.add(anchor)
+    db.commit()
+    db.refresh(anchor)
+    return anchor
+
+
+@router.delete("/anchors/{anchor_id}", status_code=204)
+def delete_anchor(anchor_id: int, db: Session = Depends(get_db)):
+    """기준점 삭제"""
+    anchor = db.query(FloorAnchor).filter(FloorAnchor.id == anchor_id).first()
+    if not anchor:
+        raise HTTPException(status_code=404, detail="기준점을 찾을 수 없습니다.")
+
+    db.delete(anchor)
+    db.commit()
+    return None
+
+
+@router.post("/floors/{floor_id}/convert/gps-to-floor")
+def convert_gps_to_floor(
+    floor_id: int,
+    lat: float,
+    lng: float,
+    db: Session = Depends(get_db),
+):
+    """GPS 좌표 → 도면 좌표 변환 (테스트/디버그용)"""
+    from app.services.coordinate import gps_to_floor
+
+    result = gps_to_floor(lat, lng, floor_id, db)
+    if result is None:
+        raise HTTPException(status_code=400, detail="앵커가 부족합니다 (최소 2개 필요)")
+
+    px_x, px_y = result
+    return {"floor_id": floor_id, "px_x": round(px_x, 2), "px_y": round(px_y, 2)}
