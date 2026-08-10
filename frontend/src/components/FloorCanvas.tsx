@@ -108,13 +108,12 @@ export default function FloorCanvas({
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="w-full h-full border border-gray-200 rounded bg-white"
-      style={{ maxHeight: "500px" }}
+      className="w-full h-auto border border-gray-200 rounded bg-white"
     >
       {/* Layer 1: 도면 배경 이미지 */}
       {floorPlanUrl && (
         <image
-          href={floorPlanUrl.startsWith("http") ? floorPlanUrl : `http://localhost:8000${floorPlanUrl}`}
+          href={floorPlanUrl}
           x={0}
           y={0}
           width={width}

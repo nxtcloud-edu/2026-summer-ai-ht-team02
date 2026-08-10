@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import Dashboard from './pages/Dashboard'
 import FloorPlan from './pages/FloorPlan'
 import Evacuation from './pages/Evacuation'
@@ -12,6 +12,19 @@ import { getStoredAuth } from './hooks/useApi'
 
 function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: () => void }) {
   const { role } = getStoredAuth();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -20,6 +33,7 @@ function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: (
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="text-xl font-bold text-red-600">FireEscape AI</h1>
           <div className="flex items-center gap-4">
+            {/* 코어 4탭 */}
             <nav className="flex gap-4">
               <NavLink
                 to="/"
@@ -46,14 +60,6 @@ function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: (
                 탈출 경로
               </NavLink>
               <NavLink
-                to="/navigate"
-                className={({ isActive }) =>
-                  `px-3 py-1 rounded text-sm ${isActive ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`
-                }
-              >
-                대피 안내
-              </NavLink>
-              <NavLink
                 to="/rescuer"
                 className={({ isActive }) =>
                   `px-3 py-1 rounded text-sm ${isActive ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`
@@ -61,24 +67,51 @@ function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: (
               >
                 구조대
               </NavLink>
-              <NavLink
-                to="/health-monitor"
-                className={({ isActive }) =>
-                  `px-3 py-1 rounded text-sm ${isActive ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`
-                }
-              >
-                건강
-              </NavLink>
-              <NavLink
-                to="/peers"
-                className={({ isActive }) =>
-                  `px-3 py-1 rounded text-sm ${isActive ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`
-                }
-              >
-                동료 위치
-              </NavLink>
             </nav>
-            <div className="flex items-center gap-2 ml-4 pl-4 border-l">
+
+            {/* 더보기 드롭다운 */}
+            <div className="relative" ref={moreRef}>
+              <button
+                onClick={() => setMoreOpen((v) => !v)}
+                className="px-3 py-1 rounded text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition"
+              >
+                더보기 ▾
+              </button>
+              {moreOpen && (
+                <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                  <NavLink
+                    to="/navigate"
+                    onClick={() => setMoreOpen(false)}
+                    className={({ isActive }) =>
+                      `block px-4 py-2 text-sm ${isActive ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-50'}`
+                    }
+                  >
+                    대피 안내
+                  </NavLink>
+                  <NavLink
+                    to="/health-monitor"
+                    onClick={() => setMoreOpen(false)}
+                    className={({ isActive }) =>
+                      `block px-4 py-2 text-sm ${isActive ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-50'}`
+                    }
+                  >
+                    건강 모니터
+                  </NavLink>
+                  <NavLink
+                    to="/peers"
+                    onClick={() => setMoreOpen(false)}
+                    className={({ isActive }) =>
+                      `block px-4 py-2 text-sm ${isActive ? 'bg-red-50 text-red-700' : 'text-gray-700 hover:bg-gray-50'}`
+                    }
+                  >
+                    동료 위치
+                  </NavLink>
+                </div>
+              )}
+            </div>
+
+            {/* 유저 정보 + 로그아웃 */}
+            <div className="flex items-center gap-2 ml-2 pl-4 border-l">
               <span className="text-xs text-gray-500">{role}</span>
               <button
                 onClick={onLogout}

@@ -174,7 +174,7 @@ export default function Dashboard() {
       )}
 
       {/* 상태 요약 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
           <p className="text-sm text-gray-500">재실 인원</p>
           <p className="text-2xl font-bold">
@@ -201,39 +201,44 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 작업자 상태 + 건강 이상 카드 */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-blue-400">
-          <p className="text-xs text-gray-500">정상</p>
-          <p className="text-xl font-bold text-blue-600">{loading ? "..." : stats.workerStates.normal}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-yellow-400">
-          <p className="text-xs text-gray-500">혼란</p>
-          <p className="text-xl font-bold text-yellow-600">{loading ? "..." : stats.workerStates.confused}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-orange-400">
-          <p className="text-xs text-gray-500">지연</p>
-          <p className="text-xl font-bold text-orange-600">{loading ? "..." : stats.workerStates.delayed}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-red-400">
-          <p className="text-xs text-gray-500">위험</p>
-          <p className="text-xl font-bold text-red-600">{loading ? "..." : stats.workerStates.at_risk}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-red-700">
-          <p className="text-xs text-gray-500">구조필요</p>
-          <p className="text-xl font-bold text-red-800">{loading ? "..." : stats.workerStates.rescue_needed}</p>
-        </div>
-        <div className="bg-white rounded-lg shadow p-3 border-l-4 border-pink-500">
-          <p className="text-xs text-gray-500">건강 이상</p>
-          <p className="text-xl font-bold text-pink-600">{loading ? "..." : stats.healthAnomalies}</p>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 도면 미니맵 */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4">건물 현황</h2>
           <BuildingOverview />
+
+          {/* 작업자 상태 상세 (접이식) */}
+          <details className="mt-4 pt-4 border-t">
+            <summary className="text-sm font-medium text-gray-600 cursor-pointer hover:text-gray-900 select-none">
+              작업자 상태 상세 ▸
+            </summary>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="text-center p-2 bg-blue-50 rounded">
+                <p className="text-xs text-gray-500">정상</p>
+                <p className="text-lg font-bold text-blue-600">{stats.workerStates.normal}</p>
+              </div>
+              <div className="text-center p-2 bg-yellow-50 rounded">
+                <p className="text-xs text-gray-500">혼란</p>
+                <p className="text-lg font-bold text-yellow-600">{stats.workerStates.confused}</p>
+              </div>
+              <div className="text-center p-2 bg-orange-50 rounded">
+                <p className="text-xs text-gray-500">지연</p>
+                <p className="text-lg font-bold text-orange-600">{stats.workerStates.delayed}</p>
+              </div>
+              <div className="text-center p-2 bg-red-50 rounded">
+                <p className="text-xs text-gray-500">위험</p>
+                <p className="text-lg font-bold text-red-600">{stats.workerStates.at_risk}</p>
+              </div>
+              <div className="text-center p-2 bg-red-50 rounded">
+                <p className="text-xs text-gray-500">구조필요</p>
+                <p className="text-lg font-bold text-red-800">{stats.workerStates.rescue_needed}</p>
+              </div>
+              <div className="text-center p-2 bg-pink-50 rounded">
+                <p className="text-xs text-gray-500">건강이상</p>
+                <p className="text-lg font-bold text-pink-600">{stats.healthAnomalies}</p>
+              </div>
+            </div>
+          </details>
         </div>
 
         {/* 실시간 알림 피드 */}
@@ -308,9 +313,7 @@ function BuildingOverview() {
     return <p className="text-gray-400 text-sm">건물 데이터를 불러오는 중...</p>;
   }
 
-  const floorPlanSrc = selectedFloor?.floor_plan_url
-    ? (selectedFloor.floor_plan_url.startsWith("http") ? selectedFloor.floor_plan_url : `http://localhost:8000${selectedFloor.floor_plan_url}`)
-    : null;
+  const floorPlanSrc = selectedFloor?.floor_plan_url || null;
 
   return (
     <div>

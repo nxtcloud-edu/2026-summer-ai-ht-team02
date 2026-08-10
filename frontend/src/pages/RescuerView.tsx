@@ -186,14 +186,10 @@ export default function RescuerView() {
       <h1 className="text-2xl font-bold mb-6">구조대 현황</h1>
 
       {/* 미대피자 요약 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-sm text-red-600">의식 불명</p>
+          <p className="text-sm text-red-600">의식 불명 / 미대피</p>
           <p className="text-3xl font-bold text-red-700">{unconscious.length}</p>
-        </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <p className="text-sm text-orange-600">미대피 (재실)</p>
-          <p className="text-3xl font-bold text-orange-700">{notEvacuated.length}</p>
         </div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <p className="text-sm text-yellow-600">SOS 요청</p>
