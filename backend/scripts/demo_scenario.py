@@ -52,9 +52,13 @@ def main():
     # ============================================================
     step(1, "출근 (gate 통과 시뮬레이션)")
     # ============================================================
-    for uid in [3, 4, 5, 6, 7]:  # worker user_ids
-        r = requests.post(f"{BASE}/api/admin/simulate/checkin/{uid}?check_type=in")
-        print(f"  User {uid} check_in: {r.status_code}")
+    # 각 worker 토큰으로 직접 check-in (JWT 기반)
+    worker_tokens = {}
+    for i in range(1, 6):
+        token = login(f"worker{i}@fire.io")
+        worker_tokens[i] = token
+        r = requests.post(f"{BASE}/api/attendance/check-in", headers=headers(token))
+        print(f"  Worker{i} check_in: {r.status_code}")
     time.sleep(1)
 
     r = requests.get(f"{BASE}/api/attendance/today")
@@ -109,9 +113,11 @@ def main():
     # ============================================================
     step(5, "심박 이상 투입 (Worker2)")
     # ============================================================
+    # 심박 180bpm — baseline(avg~72, std~6) 대비 z > 15로 확실한 이상
     for i in range(3):
-        r = requests.post(f"{BASE}/api/admin/simulate/health/4?hr=135&temp=37.8")
-        print(f"  Worker2 심박 이상 #{i+1}: {r.json().get('result', {}).get('anomaly_detected')}")
+        r = requests.post(f"{BASE}/api/admin/simulate/health/4?hr=180&temp=39.5")
+        result = r.json().get("result", {})
+        print(f"  Worker2 심박 이상 #{i+1}: anomaly={result.get('anomaly_detected')}, count={result.get('consecutive_count')}")
     time.sleep(1)
 
     # ============================================================
@@ -124,16 +130,31 @@ def main():
     # ============================================================
     step(7, "구조대 진입 경로 요청")
     # ============================================================
+    # 화재 해제 전이므로 일부 엣지 차단 상태 — 비상계단 방향에서 진입
     r = requests.get(
         f"{BASE}/api/evacuation/rescuer-route/4",
-        params={"floor_id": 2, "x": 4000, "y": 12800},  # 정문에서 출발
+        params={"floor_id": 2, "x": 8000, "y": 6400},  # 복도 중앙에서 출발 (차단 밖)
         headers=headers(rescuer_token),
     )
     if r.status_code == 200:
         data = r.json()
         print(f"  구조대 → Worker2 경로: 거리 {data.get('distance')}m, 노드 {len(data.get('path', []))}개")
     else:
-        print(f"  경로 요청 실패: {r.status_code} {r.text}")
+        print(f"  경로 요청: {r.status_code} — {r.json().get('detail', r.text)}")
+        # 차단으로 실패 시 알림 해제 후 재시도
+        print("  → 화재 해제 후 재시도...")
+        requests.put(f"{BASE}/api/alerts/{alert_id}/resolve")
+        time.sleep(0.5)
+        r = requests.get(
+            f"{BASE}/api/evacuation/rescuer-route/4",
+            params={"floor_id": 2, "x": 8000, "y": 6400},
+            headers=headers(rescuer_token),
+        )
+        if r.status_code == 200:
+            data = r.json()
+            print(f"  (해제 후) 구조대 경로: 거리 {data.get('distance')}m, 노드 {len(data.get('path', []))}개")
+        else:
+            print(f"  재시도 실패: {r.status_code} {r.json().get('detail', '')}")
     time.sleep(1)
 
     # ============================================================
