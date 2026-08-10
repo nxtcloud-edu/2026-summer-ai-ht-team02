@@ -1,6 +1,7 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 import json
 import os
 
@@ -13,6 +14,7 @@ from app.routers import (
     alerts_router,
     evacuation_router,
     peers_router,
+    admin_simulate_router,
 )
 
 # Create tables
@@ -39,11 +41,23 @@ app.include_router(locations_router)
 app.include_router(alerts_router)
 app.include_router(evacuation_router)
 app.include_router(peers_router)
+app.include_router(admin_simulate_router)
 
 # Static files (도면 이미지 서빙)
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+
+# --- Background Tasks ---
+
+from app.services.unconscious_checker import unconscious_check_loop
+
+
+@app.on_event("startup")
+async def start_background_tasks():
+    """서버 시작 시 의식불명 감지 백그라운드 루프 실행"""
+    asyncio.create_task(unconscious_check_loop())
 
 
 # --- WebSocket Endpoints ---

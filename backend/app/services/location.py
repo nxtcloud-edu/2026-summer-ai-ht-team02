@@ -52,6 +52,28 @@ def update_worker_location(
     return {"user_id": user_id, "floor_id": floor_id, "x": x, "y": y}
 
 
+def check_stale_locations(db: Session, timeout_seconds: int = 30) -> List[int]:
+    """
+    위치 갱신이 timeout_seconds 이상 없는 유저를 찾아
+    is_moving=False로 전환. 반환값: 전환된 user_id 리스트
+    """
+    threshold = datetime.utcnow() - timedelta(seconds=timeout_seconds)
+    stale = (
+        db.query(EvacuationStatus)
+        .filter(EvacuationStatus.updated_at < threshold)
+        .filter(EvacuationStatus.is_moving == True)
+        .filter(EvacuationStatus.status.in_(["in_building", "evacuating"]))
+        .all()
+    )
+    stale_user_ids = []
+    for s in stale:
+        s.is_moving = False
+        stale_user_ids.append(s.user_id)
+    if stale_user_ids:
+        db.commit()
+    return stale_user_ids
+
+
 def detect_unconscious(user_id: int, db: Session, timeout_seconds: int = 30) -> bool:
     """의식 불명 감지: 일정 시간 움직임 없음 + 비정상 심박"""
     evac_status = db.query(EvacuationStatus).filter(EvacuationStatus.user_id == user_id).first()
