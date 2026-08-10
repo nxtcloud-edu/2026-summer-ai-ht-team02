@@ -31,7 +31,7 @@ function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: (
       {/* 헤더 */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-red-600">FireEscape AI</h1>
+          <h1 className="text-xl font-bold text-red-600">ITDA</h1>
           <div className="flex items-center gap-4">
             {/* 코어 4탭 */}
             <nav className="flex gap-4">

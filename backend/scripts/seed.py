@@ -72,7 +72,7 @@ def seed():
         # 건물 + 층
         # ============================================================
         print("[3/8] 건물/층 생성...")
-        building = Building(name="FireEscape 교육센터", address="서울시 강남구 테헤란로 123", total_floors=4)
+        building = Building(name="HL인재개발원", address="서울시 강남구 테헤란로 123", total_floors=4)
         db.add(building)
         db.flush()
 

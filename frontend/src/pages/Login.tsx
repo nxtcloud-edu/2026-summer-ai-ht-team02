@@ -35,7 +35,7 @@ export default function Login({ onLoginSuccess }: LoginProps) {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
         <h1 className="text-2xl font-bold text-center text-red-600 mb-2">
-          FireEscape AI
+          ITDA
         </h1>
         <p className="text-center text-gray-500 mb-6 text-sm">
           위치 기반 실시간 탈출 경로 시스템

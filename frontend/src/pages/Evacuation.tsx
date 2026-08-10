@@ -13,13 +13,15 @@ interface RouteInfo {
 }
 
 export default function Evacuation() {
-  const [floorId, setFloorId] = useState<number | null>(1);
+  const [floorId, setFloorId] = useState<number | null>(null);
+  const [floors, setFloors] = useState<Array<{ id: number; name: string; floor_number: number }>>([]);
   const [nodes, setNodes] = useState<NodeData[]>([]);
   const [edges, setEdges] = useState<EdgeData[]>([]);
   const [route, setRoute] = useState<RouteInfo | null>(null);
   const [fireZones, setFireZones] = useState<FireZone[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasFireAlert, setHasFireAlert] = useState(false);
+  const [fireAlertDetails, setFireAlertDetails] = useState<Array<{ floor_id?: number; x?: number; y?: number; message?: string }>>([]);
 
   const { userId, role } = getStoredAuth();
   const parsedUserId = userId ? parseInt(userId, 10) : 0;
@@ -29,28 +31,37 @@ export default function Evacuation() {
 
   // 현재 유저 위치 로드
   useEffect(() => {
-    async function loadMyLocation() {
-      try {
-        const res = await api.get(`/api/locations/current/${parsedUserId}`);
-        const data = res.data;
-        if (data.floor_id) setFloorId(data.floor_id);
-        if (data.x != null && data.y != null) setCurrentPos({ x: data.x, y: data.y });
-      } catch {
-        // 위치 정보 없으면 첫 번째 층 로드 시도
-        loadDefaultFloor();
-      }
-    }
-    async function loadDefaultFloor() {
+    async function loadFloors() {
       try {
         const bRes = await api.get("/api/buildings/");
         if (bRes.data.length > 0) {
           const fRes = await api.get(`/api/buildings/${bRes.data[0].id}/floors`);
-          const f1 = fRes.data.find((f: { floor_number: number }) => f.floor_number === 1) || fRes.data[0];
-          if (f1) setFloorId(f1.id);
+          setFloors(fRes.data);
+          return fRes.data;
         }
       } catch { /* ignore */ }
+      return [];
     }
-    if (parsedUserId) loadMyLocation();
+    async function loadMyLocation() {
+      const floorList = await loadFloors();
+      try {
+        const res = await api.get(`/api/locations/current/${parsedUserId}`);
+        const data = res.data;
+        if (data.floor_id) setFloorId(data.floor_id);
+        else if (floorList.length > 0) {
+          const f1 = floorList.find((f: { floor_number: number }) => f.floor_number === 1) || floorList[0];
+          if (f1) setFloorId(f1.id);
+        }
+        if (data.x != null && data.y != null) setCurrentPos({ x: data.x, y: data.y });
+      } catch {
+        // 위치 정보 없으면 첫 번째 층
+        if (floorList.length > 0) {
+          const f1 = floorList.find((f: { floor_number: number }) => f.floor_number === 1) || floorList[0];
+          if (f1) setFloorId(f1.id);
+        }
+      }
+    }
+    loadMyLocation();
   }, [parsedUserId]);
 
   // 노드/엣지 로드
@@ -74,16 +85,18 @@ export default function Evacuation() {
 
   // 화재 알림 확인
   useEffect(() => {
+    if (!floorId) return;
     async function checkAlerts() {
       try {
         const res = await api.get("/api/alerts/active");
-        const fires = (res.data as Array<{ type: string; floor_id?: number; x?: number; y?: number }>)
+        const fires = (res.data as Array<{ type: string; floor_id?: number; x?: number; y?: number; message?: string }>)
           .filter((a) => a.type === "fire");
         setHasFireAlert(fires.length > 0);
+        setFireAlertDetails(fires.map((a) => ({ floor_id: a.floor_id, x: a.x, y: a.y, message: a.message })));
         setFireZones(
           fires
             .filter((a) => a.floor_id === floorId && a.x != null && a.y != null)
-            .map((a) => ({ x: a.x!, y: a.y!, radius: 50 }))
+            .map((a) => ({ x: a.x!, y: a.y!, radius: 1500 }))
         );
       } catch {
         // 무시
@@ -127,10 +140,20 @@ export default function Evacuation() {
     (msg: WSMessage) => {
       if (msg.type === "fire_alert") {
         setHasFireAlert(true);
+        // 화재 위치 상세 추가
+        setFireAlertDetails((prev) => [
+          ...prev,
+          {
+            floor_id: msg.floor_id as number | undefined,
+            x: msg.x as number | undefined,
+            y: msg.y as number | undefined,
+            message: msg.message as string | undefined,
+          },
+        ]);
         if (msg.floor_id === floorId && msg.x != null && msg.y != null) {
           setFireZones((prev) => [
             ...prev,
-            { x: msg.x as number, y: msg.y as number, radius: 50 },
+            { x: msg.x as number, y: msg.y as number, radius: 1500 },
           ]);
         }
         // 엣지 리로드 후 경로 재계산
@@ -178,6 +201,19 @@ export default function Evacuation() {
                 가장 가까운 출구로 이동하세요.
               </p>
             </div>
+          </div>
+          {/* 화재 발생 위치 상세 */}
+          <div className="mt-3 space-y-1 pl-9">
+            {fireAlertDetails.map((fire, idx) => (
+              <p key={idx} className="text-sm text-red-700 font-medium">
+                📍 {fire.message || `${fire.floor_id ?? "?"}층 화재 발생`}
+                {fire.x != null && fire.y != null && (
+                  <span className="text-red-500 font-normal ml-1">
+                    (좌표: {Math.round(fire.x)}, {Math.round(fire.y)})
+                  </span>
+                )}
+              </p>
+            ))}
           </div>
         </div>
       )}
@@ -257,14 +293,17 @@ export default function Evacuation() {
 
           <div className="bg-white rounded-lg shadow p-4">
             <h3 className="font-semibold mb-2">층 선택</h3>
-            <input
-              type="number"
-              min={1}
+            <select
               value={floorId ?? ""}
               onChange={(e) => setFloorId(Number(e.target.value))}
               className="w-full px-3 py-2 border rounded text-sm"
-              placeholder="층 ID"
-            />
+            >
+              {floors.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name || `${f.floor_number}층`}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </div>

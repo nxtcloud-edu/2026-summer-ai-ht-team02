@@ -156,7 +156,7 @@ export default function Dashboard() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">FireEscape 관리자 대시보드</h1>
+        <h1 className="text-2xl font-bold">ITDA 관리자 대시보드</h1>
         <div className="flex items-center gap-2">
           <span
             className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500" : "bg-gray-400"}`}
@@ -277,6 +277,10 @@ function BuildingOverview() {
   const [floors, setFloors] = useState<Array<{ id: number; name?: string; floor_plan_url?: string }>>([]);
   const [selectedFloor, setSelectedFloor] = useState<{ id: number; name?: string; floor_plan_url?: string } | null>(null);
   const [workers, setWorkers] = useState<Array<{ user_id: number; x: number; y: number; status?: string }>>([]);
+  const [fireAlerts, setFireAlerts] = useState<Array<{ x: number; y: number; message?: string }>>([]);
+  // 도면 실제 크기 (FloorCanvas 기준 30000 x 12800)
+  const PLAN_WIDTH = 30000;
+  const PLAN_HEIGHT = 12800;
 
   useEffect(() => {
     async function load() {
@@ -309,6 +313,23 @@ function BuildingOverview() {
     loadWorkers();
   }, [selectedFloor]);
 
+  // 현재 층의 화재 알림 좌표 로드
+  useEffect(() => {
+    if (!selectedFloor) return;
+    async function loadFireAlerts() {
+      try {
+        const res = await api.get("/api/alerts/active");
+        const fires = (res.data as Array<{ type: string; floor_id?: number; x?: number; y?: number; message?: string }>)
+          .filter((a) => a.type === "fire" && a.floor_id === selectedFloor!.id && a.x != null && a.y != null)
+          .map((a) => ({ x: a.x!, y: a.y!, message: a.message }));
+        setFireAlerts(fires);
+      } catch {
+        setFireAlerts([]);
+      }
+    }
+    loadFireAlerts();
+  }, [selectedFloor]);
+
   if (floors.length === 0) {
     return <p className="text-gray-400 text-sm">건물 데이터를 불러오는 중...</p>;
   }
@@ -332,7 +353,7 @@ function BuildingOverview() {
         ))}
       </div>
 
-      {/* 도면 + 근로자 */}
+      {/* 도면 + 근로자 + 화재 위치 */}
       <div className="relative h-56 border rounded overflow-hidden bg-gray-50">
         {floorPlanSrc ? (
           <img src={floorPlanSrc} alt="도면" className="w-full h-full object-contain opacity-80" />
@@ -341,10 +362,32 @@ function BuildingOverview() {
             도면 미등록
           </div>
         )}
+        {/* 화재 위치 마커 오버레이 */}
+        {fireAlerts.map((fire, idx) => (
+          <div
+            key={`fire-${idx}`}
+            className="absolute flex items-center justify-center"
+            style={{
+              left: `${(fire.x / PLAN_WIDTH) * 100}%`,
+              top: `${(fire.y / PLAN_HEIGHT) * 100}%`,
+              transform: "translate(-50%, -50%)",
+            }}
+            title={fire.message || "화재 발생 지점"}
+          >
+            <span className="absolute w-8 h-8 bg-red-500 rounded-full opacity-30 animate-ping" />
+            <span className="relative text-lg">🔥</span>
+          </div>
+        ))}
         {/* 근로자 마커 오버레이 */}
         {workers.length > 0 && (
           <div className="absolute top-2 left-2 bg-white/80 rounded px-2 py-1 text-xs text-gray-600">
             재실자 {workers.length}명
+          </div>
+        )}
+        {/* 화재 카운트 배지 */}
+        {fireAlerts.length > 0 && (
+          <div className="absolute top-2 right-2 bg-red-600 text-white rounded px-2 py-1 text-xs font-bold animate-pulse">
+            🔥 화재 {fireAlerts.length}건
           </div>
         )}
       </div>
