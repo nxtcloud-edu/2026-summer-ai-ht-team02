@@ -8,12 +8,16 @@ from app.models.user import User, UserRole
 from app.dependencies import get_current_user, require_role
 from app.services.location import (
     update_worker_location,
+    detect_unconscious,
     get_user_current_location,
     get_all_current_locations,
     get_floor_workers,
     get_location_history,
 )
+from app.services.alert import create_unconscious_alert
+from app.models.location import EvacuationStatus
 from app.websocket_manager import manager
+from app.config import settings
 
 router = APIRouter(prefix="/api/locations", tags=["locations"])
 
@@ -92,6 +96,40 @@ async def update_location(
         x=data.x,
         y=data.y,
     )
+
+    # 심박 이상 감지: 임계값 이하이면 즉시 의식불명 판정
+    if data.heart_rate is not None and data.heart_rate < settings.HEARTRATE_THRESHOLD_LOW:
+        if detect_unconscious(current_user.id, db, settings.UNCONSCIOUS_TIMEOUT_SECONDS):
+            evac = (
+                db.query(EvacuationStatus)
+                .filter(EvacuationStatus.user_id == current_user.id)
+                .first()
+            )
+            if evac and evac.status != "unconscious":
+                evac.status = "unconscious"
+                evac.is_moving = False
+                db.commit()
+
+                create_unconscious_alert(
+                    user_id=current_user.id,
+                    floor_id=evac.last_floor_id,
+                    x=evac.last_x,
+                    y=evac.last_y,
+                    reason="heartrate",
+                    db=db,
+                )
+
+                msg = {
+                    "type": "unconscious_detected",
+                    "user_id": current_user.id,
+                    "floor_id": evac.last_floor_id,
+                    "x": evac.last_x,
+                    "y": evac.last_y,
+                    "reason": "abnormal_heartrate",
+                    "heart_rate": data.heart_rate,
+                }
+                await manager.broadcast_to_rescuers(msg)
+                await manager.broadcast_to_admins(msg)
 
     return LocationResponse(
         user_id=result["user_id"],

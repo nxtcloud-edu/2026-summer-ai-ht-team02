@@ -159,3 +159,40 @@ def _unblock_nearby_edges(floor_id: int, x: float, y: float, radius: float, db: 
         )
         for edge in edges:
             edge.is_blocked = 0
+
+
+def create_unconscious_alert(
+    user_id: int,
+    floor_id: int,
+    x: float,
+    y: float,
+    reason: str,
+    db: Session,
+) -> dict:
+    """의식 불명 감지 알림 생성
+
+    Args:
+        reason: "timeout" | "fall" | "heartrate" | "admin"
+    """
+    alert = Alert(
+        alert_type=AlertType.UNCONSCIOUS,
+        level=AlertLevel.CRITICAL,
+        floor_id=floor_id,
+        x=x,
+        y=y,
+        message=f"의식불명 감지 (원인: {reason}), user_id={user_id}",
+        source_user_id=user_id,
+    )
+    db.add(alert)
+    db.commit()
+    db.refresh(alert)
+
+    return {
+        "alert_id": alert.id,
+        "type": alert.alert_type.value,
+        "user_id": user_id,
+        "floor_id": floor_id,
+        "x": x,
+        "y": y,
+        "reason": reason,
+    }

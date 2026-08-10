@@ -4,3 +4,4 @@ from app.routers.locations import router as locations_router
 from app.routers.alerts import router as alerts_router
 from app.routers.evacuation import router as evacuation_router
 from app.routers.peers import router as peers_router
+from app.routers.admin_simulate import router as admin_simulate_router
