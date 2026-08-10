@@ -32,8 +32,10 @@ api.interceptors.response.use(
       localStorage.removeItem("access_token");
       localStorage.removeItem("user_id");
       localStorage.removeItem("user_role");
-      // 로그인 페이지로 리디렉트 (SPA 라우팅)
-      window.location.href = "/login";
+      // 로그인 페이지가 존재할 때만 리디렉트
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

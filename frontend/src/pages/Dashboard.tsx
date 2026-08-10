@@ -179,9 +179,7 @@ export default function Dashboard() {
         {/* 도면 미니맵 */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4">건물 현황</h2>
-          <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-200 rounded">
-            <p className="text-gray-400">층별 도면 + 근로자 위치 표시 영역</p>
-          </div>
+          <BuildingOverview />
         </div>
 
         {/* 실시간 알림 피드 */}
@@ -215,6 +213,87 @@ export default function Dashboard() {
 }
 
 // --- Helper Functions ---
+
+function BuildingOverview() {
+  const [floors, setFloors] = useState<Array<{ id: number; name?: string; floor_plan_url?: string }>>([]);
+  const [selectedFloor, setSelectedFloor] = useState<{ id: number; name?: string; floor_plan_url?: string } | null>(null);
+  const [workers, setWorkers] = useState<Array<{ user_id: number; x: number; y: number; status?: string }>>([]);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const bRes = await api.get("/api/buildings/");
+        if (bRes.data.length > 0) {
+          const fRes = await api.get(`/api/buildings/${bRes.data[0].id}/floors`);
+          setFloors(fRes.data);
+          if (fRes.data.length > 0) {
+            // 1F가 있으면 선택, 없으면 첫 번째
+            const f1 = fRes.data.find((f: { floor_number: number }) => f.floor_number === 1) || fRes.data[0];
+            setSelectedFloor(f1);
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedFloor) return;
+    async function loadWorkers() {
+      try {
+        const res = await api.get(`/api/locations/floor/${selectedFloor!.id}`);
+        setWorkers(res.data);
+      } catch {
+        setWorkers([]);
+      }
+    }
+    loadWorkers();
+  }, [selectedFloor]);
+
+  if (floors.length === 0) {
+    return <p className="text-gray-400 text-sm">건물 데이터를 불러오는 중...</p>;
+  }
+
+  const floorPlanSrc = selectedFloor?.floor_plan_url
+    ? (selectedFloor.floor_plan_url.startsWith("http") ? selectedFloor.floor_plan_url : `http://localhost:8000${selectedFloor.floor_plan_url}`)
+    : null;
+
+  return (
+    <div>
+      {/* 층 탭 */}
+      <div className="flex gap-1 mb-3">
+        {floors.map((f) => (
+          <button
+            key={f.id}
+            onClick={() => setSelectedFloor(f)}
+            className={`px-3 py-1 rounded text-xs transition ${
+              selectedFloor?.id === f.id ? "bg-red-100 text-red-700 font-medium" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}
+          >
+            {f.name || `${f.id}층`}
+          </button>
+        ))}
+      </div>
+
+      {/* 도면 + 근로자 */}
+      <div className="relative h-56 border rounded overflow-hidden bg-gray-50">
+        {floorPlanSrc ? (
+          <img src={floorPlanSrc} alt="도면" className="w-full h-full object-contain opacity-80" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm">
+            도면 미등록
+          </div>
+        )}
+        {/* 근로자 마커 오버레이 */}
+        {workers.length > 0 && (
+          <div className="absolute top-2 left-2 bg-white/80 rounded px-2 py-1 text-xs text-gray-600">
+            재실자 {workers.length}명
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function getAlertIcon(type: string): string {
   switch (type) {
