@@ -113,3 +113,67 @@ def get_unconscious_workers(db: Session) -> List[dict]:
         }
         for w in workers
     ]
+
+
+def get_user_current_location(user_id: int, db: Session) -> Optional[dict]:
+    """특정 근로자의 현재 위치 (EvacuationStatus 기반)"""
+    evac_status = db.query(EvacuationStatus).filter(EvacuationStatus.user_id == user_id).first()
+    if not evac_status:
+        return None
+
+    return {
+        "user_id": evac_status.user_id,
+        "floor_id": evac_status.last_floor_id,
+        "x": evac_status.last_x,
+        "y": evac_status.last_y,
+        "status": evac_status.status,
+        "is_moving": evac_status.is_moving,
+        "heart_rate": evac_status.heart_rate,
+        "updated_at": str(evac_status.updated_at) if evac_status.updated_at else None,
+    }
+
+
+def get_all_current_locations(db: Session) -> List[dict]:
+    """전체 재실자 현재 위치 목록"""
+    statuses = (
+        db.query(EvacuationStatus)
+        .filter(EvacuationStatus.status.in_(["in_building", "evacuating"]))
+        .all()
+    )
+
+    return [
+        {
+            "user_id": s.user_id,
+            "floor_id": s.last_floor_id,
+            "x": s.last_x,
+            "y": s.last_y,
+            "status": s.status,
+            "is_moving": s.is_moving,
+            "heart_rate": s.heart_rate,
+            "updated_at": str(s.updated_at) if s.updated_at else None,
+        }
+        for s in statuses
+    ]
+
+
+def get_location_history(user_id: int, db: Session, limit: int = 50) -> List[dict]:
+    """위치 이력 조회 (이동 경로 추적)"""
+    locations = (
+        db.query(WorkerLocation)
+        .filter(WorkerLocation.user_id == user_id)
+        .order_by(WorkerLocation.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "id": loc.id,
+            "floor_id": loc.floor_id,
+            "x": loc.x,
+            "y": loc.y,
+            "accuracy": loc.accuracy,
+            "timestamp": str(loc.timestamp) if loc.timestamp else None,
+        }
+        for loc in locations
+    ]
