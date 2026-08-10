@@ -6,3 +6,4 @@ from app.routers.evacuation import router as evacuation_router
 from app.routers.peers import router as peers_router
 from app.routers.admin_simulate import router as admin_simulate_router
 from app.routers.health import router as health_router
+from app.routers.attendance import router as attendance_router
