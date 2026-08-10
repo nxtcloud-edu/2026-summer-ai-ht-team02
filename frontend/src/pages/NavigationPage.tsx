@@ -14,6 +14,7 @@ interface GuidanceData {
   bearing: number | null;
   total_distance_m: number | null;
   exit_name: string | null;
+  arrived: boolean;
   message: string | null;
 }
 
@@ -42,11 +43,13 @@ export default function NavigationPage() {
   /** 서버에 guidance 요청 */
   const fetchGuidance = useCallback(async (x: number, y: number) => {
     try {
+      const userId = localStorage.getItem("user_id");
       const res = await api.post<GuidanceData>("/api/evacuation/guidance", {
         floor_id: floorId,
         x,
         y,
         heading,
+        user_id: userId ? Number(userId) : undefined,
       });
       setGuidance(res.data);
       setError(null);
@@ -229,6 +232,18 @@ export default function NavigationPage() {
           <div className="flex flex-col items-center gap-4">
             <div className="text-5xl">🚫</div>
             <p className="text-yellow-400 text-center">{guidance.message}</p>
+          </div>
+        ) : guidance && guidance.arrived ? (
+          <div className="flex flex-col items-center gap-6">
+            <div className="text-7xl animate-bounce">✅</div>
+            <h2 className="text-2xl font-bold text-green-400">대피 완료!</h2>
+            <p className="text-gray-300 text-center text-lg">
+              출구에 도착했습니다.<br />건물 밖으로 이동하세요.
+            </p>
+            <div className="mt-4 px-6 py-3 bg-green-600/20 border border-green-500 rounded-xl text-center">
+              <p className="text-green-400 text-sm">도착 출구</p>
+              <p className="text-white text-xl font-semibold">{guidance.exit_name || "출구"}</p>
+            </div>
           </div>
         ) : guidance ? (
           <>

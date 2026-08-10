@@ -251,6 +251,7 @@ class GuidanceRequest(BaseModel):
     x: float            # 현재 도면 좌표 (mm)
     y: float
     heading: Optional[float] = 0.0  # 사용자 진행 방향 (degree, 디바이스 컴퍼스. 0=북)
+    user_id: Optional[int] = None   # 도착 시 대피 상태 자동 전환용
 
 
 class GuidanceResponse(BaseModel):
@@ -266,6 +267,7 @@ class GuidanceResponse(BaseModel):
     total_distance_m: Optional[float] = None  # 출구까지 총 남은 거리
     exit_name: Optional[str] = None         # 목표 출구 이름
     path: Optional[List[PathNode]] = None   # 전체 경로 (프론트 시각화용)
+    arrived: bool = False                   # 출구 도착 여부
     message: Optional[str] = None           # 에러 메시지
 
 
@@ -358,18 +360,38 @@ async def get_guidance(data: GuidanceRequest, db: Session = Depends(get_db)):
     except Exception:
         pass  # AI 실패 시 로컬 결과만 사용
 
+    # 5. 도착 감지: 출구 노드까지 5m(5000mm) 이내이면 대피 완료 처리
+    ARRIVAL_THRESHOLD_MM = 5000.0
+    arrived = False
+    total_dist_m = round(total_distance_mm * 0.001, 1)
+
+    if total_distance_mm <= ARRIVAL_THRESHOLD_MM:
+        arrived = True
+        # 대피 상태를 evacuated로 자동 전환
+        if data.user_id:
+            evac_status = (
+                db.query(EvacuationStatus)
+                .filter(EvacuationStatus.user_id == data.user_id)
+                .first()
+            )
+            if evac_status and evac_status.status != "evacuated":
+                evac_status.status = "evacuated"
+                evac_status.updated_at = datetime.utcnow()
+                db.commit()
+
     return GuidanceResponse(
         success=True,
         direction=step["direction"],
         arrow=step["arrow"],
         rotate_deg=step["rotate_deg"],
         distance_m=step["distance_m"],
-        instruction=ai_instruction or step["instruction"],
+        instruction="🎉 출구에 도착했습니다! 건물 밖으로 대피하세요." if arrived else (ai_instruction or step["instruction"]),
         warning=warning,
         next_landmark=step["next_landmark"],
         bearing=step["bearing"],
-        total_distance_m=round(total_distance_mm * 0.001, 1),
+        total_distance_m=total_dist_m,
         exit_name=exit_name,
         path=[PathNode(**node) for node in path_coords],
+        arrived=arrived,
         message=None,
     )
