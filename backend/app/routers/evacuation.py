@@ -7,7 +7,11 @@ from datetime import datetime
 from app.models.database import get_db
 from app.models.location import EvacuationStatus
 from app.models.user import User
+from app.models.building import Floor
+from app.models.alert import Alert, AlertType
 from app.services.evacuation import calculate_evacuation_route, calculate_rescuer_route
+from app.services.direction import compute_next_step, direction_to_degrees, direction_to_arrow
+from app.services.ai_route import generate_ai_guidance
 from app.services.location import get_unconscious_workers as svc_get_unconscious
 
 router = APIRouter(prefix="/api/evacuation", tags=["evacuation"])
@@ -237,4 +241,135 @@ def get_rescuer_route(
         target_node=result["target_node"],
         distance=result["distance"],
         path=[PathNode(**node) for node in result["path"]],
+    )
+
+
+# --- AI Guidance Endpoint ---
+
+class GuidanceRequest(BaseModel):
+    floor_id: int
+    x: float            # 현재 도면 좌표 (mm)
+    y: float
+    heading: Optional[float] = 0.0  # 사용자 진행 방향 (degree, 디바이스 컴퍼스. 0=북)
+
+
+class GuidanceResponse(BaseModel):
+    success: bool
+    direction: Optional[str] = None         # straight, left, right, ...
+    arrow: Optional[str] = None             # ⬆️, ⬅️, ➡️, ...
+    rotate_deg: Optional[float] = None      # CSS rotate 각도 (프론트 화살표용)
+    distance_m: Optional[float] = None      # 다음 waypoint까지 거리 (m)
+    instruction: Optional[str] = None       # 한국어 안내 문구
+    warning: Optional[str] = None           # 위험 경고 (화재 근처 시)
+    next_landmark: Optional[str] = None     # 다음 랜드마크 (출구A, 계단1 등)
+    bearing: Optional[float] = None         # 절대 방위각
+    total_distance_m: Optional[float] = None  # 출구까지 총 남은 거리
+    exit_name: Optional[str] = None         # 목표 출구 이름
+    path: Optional[List[PathNode]] = None   # 전체 경로 (프론트 시각화용)
+    message: Optional[str] = None           # 에러 메시지
+
+
+@router.post("/guidance", response_model=GuidanceResponse)
+async def get_guidance(data: GuidanceRequest, db: Session = Depends(get_db)):
+    """
+    Worker 모바일 화살표 방향 안내 API
+
+    현재 위치 + 층 정보를 받아:
+    1. 최적 대피 경로 계산 (Dijkstra)
+    2. 로컬 방향/거리 계산 (즉시 응답)
+    3. OpenAI 자연어 안내 생성 (선택적 보강)
+
+    반환: 화살표 방향 + 거리 + 안내 문구
+    """
+    # 1. 경로 계산
+    route_result = calculate_evacuation_route(data.floor_id, data.x, data.y, db)
+
+    if not route_result.get("success"):
+        return GuidanceResponse(
+            success=False,
+            message=route_result.get("message", "경로를 찾을 수 없습니다."),
+        )
+
+    path_coords = route_result["path"]
+    total_distance_mm = route_result["distance"]
+
+    # 2. 로컬 방향 계산 (즉시)
+    step = compute_next_step(
+        current_x=data.x,
+        current_y=data.y,
+        path_coords=path_coords,
+        user_heading=data.heading or 0.0,
+    )
+
+    # 출구 이름 찾기
+    exit_name = None
+    if path_coords:
+        last_node = path_coords[-1]
+        exit_name = last_node.get("label") or (
+            "출구" if last_node.get("node_type") == "exit" else None
+        )
+
+    # 3. 화재 위치 조회 (경고 메시지용)
+    fire_alerts = (
+        db.query(Alert)
+        .filter(Alert.alert_type == AlertType.FIRE, Alert.is_resolved == False)
+        .filter(Alert.floor_id == data.floor_id)
+        .all()
+    )
+    fire_positions = [{"x": a.x, "y": a.y} for a in fire_alerts if a.x and a.y]
+
+    # 화재 근접 경고 (현재 위치에서 10m 이내 화재)
+    warning = None
+    for fire in fire_positions:
+        from app.services.direction import calculate_distance_m
+        fire_dist = calculate_distance_m(data.x, data.y, fire["x"], fire["y"])
+        if fire_dist < 10:
+            warning = f"⚠️ {fire_dist:.0f}m 앞에 화재 구역이 있습니다. 우회 경로로 이동 중입니다."
+            break
+
+    # 4. OpenAI 보강 (API 키가 설정된 경우에만)
+    ai_instruction = None
+    try:
+        floor = db.query(Floor).filter(Floor.id == data.floor_id).first()
+        floor_name = floor.name if floor else "알 수 없음"
+
+        # path_coords에 label 정보 추가
+        from app.models.building import FloorNode
+        enriched_path = []
+        for p in path_coords:
+            node = db.query(FloorNode).filter(FloorNode.id == p["node_id"]).first()
+            enriched_path.append({
+                **p,
+                "label": node.label if node else "",
+            })
+
+        ai_result = await generate_ai_guidance(
+            current_x=data.x,
+            current_y=data.y,
+            path_coords=enriched_path,
+            fire_positions=fire_positions,
+            floor_name=floor_name,
+        )
+
+        if ai_result:
+            ai_instruction = ai_result.get("instruction")
+            if ai_result.get("warning"):
+                warning = ai_result["warning"]
+    except Exception:
+        pass  # AI 실패 시 로컬 결과만 사용
+
+    return GuidanceResponse(
+        success=True,
+        direction=step["direction"],
+        arrow=step["arrow"],
+        rotate_deg=step["rotate_deg"],
+        distance_m=step["distance_m"],
+        instruction=ai_instruction or step["instruction"],
+        warning=warning,
+        next_landmark=step["next_landmark"],
+        bearing=step["bearing"],
+        total_distance_m=round(total_distance_mm * 0.001, 1),
+        exit_name=exit_name,
+        path=[PathNode(**node) for node in path_coords],
+        message=None,
     )
