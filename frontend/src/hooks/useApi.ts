@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 /**
  * axios 인스턴스 — JWT 토큰 자동 첨부 + 401 시 로그아웃 처리

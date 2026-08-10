@@ -26,7 +26,7 @@ def create_fire_alert(
 
     # 화재 위치 주변 엣지 차단 (반경 기반)
     if x is not None and y is not None:
-        _block_nearby_edges(floor_id, x, y, radius=50.0, db=db)
+        _block_nearby_edges(floor_id, x, y, radius=3000.0, db=db)
 
     db.commit()
     db.refresh(alert)
@@ -103,7 +103,7 @@ def resolve_alert(alert_id: int, db: Session) -> bool:
 
     # 화재 알림이면 차단된 엣지 복구
     if alert.alert_type == AlertType.FIRE and alert.x and alert.y:
-        _unblock_nearby_edges(alert.floor_id, alert.x, alert.y, radius=50.0, db=db)
+        _unblock_nearby_edges(alert.floor_id, alert.x, alert.y, radius=3000.0, db=db)
 
     db.commit()
     return True

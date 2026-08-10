@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     UNCONSCIOUS_CHECK_INTERVAL: int = 10    # 백그라운드 체크 주기 (초)
     HEARTRATE_THRESHOLD_LOW: int = 40       # 심박 이상 하한선 (bpm)
 
+    # OpenAI
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+
     # Health Monitoring (Z-score)
     HEALTH_EMA_ALPHA: float = 0.05          # EMA 가중치
     HEALTH_BASELINE_MIN_SAMPLES: int = 50   # baseline 초기화 최소 샘플

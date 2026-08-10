@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import FloorPlan from './pages/FloorPlan'
 import Evacuation from './pages/Evacuation'
 import RescuerView from './pages/RescuerView'
+import NavigationPage from './pages/NavigationPage'
 import Login from './pages/Login'
 import HealthMonitor from './pages/HealthMonitor'
 import { getStoredAuth } from './hooks/useApi'
@@ -42,6 +43,14 @@ function Layout({ children, onLogout }: { children: React.ReactNode; onLogout: (
                 }
               >
                 탈출 경로
+              </NavLink>
+              <NavLink
+                to="/navigate"
+                className={({ isActive }) =>
+                  `px-3 py-1 rounded text-sm ${isActive ? 'bg-red-100 text-red-700' : 'text-gray-600 hover:text-gray-900'}`
+                }
+              >
+                대피 안내
               </NavLink>
               <NavLink
                 to="/rescuer"
@@ -113,6 +122,7 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/floor-plan" element={<FloorPlan />} />
         <Route path="/evacuation" element={<Evacuation />} />
+        <Route path="/navigate" element={<NavigationPage />} />
         <Route path="/rescuer" element={<RescuerView />} />
         <Route path="/health-monitor" element={<HealthMonitor />} />
         <Route path="/login" element={<Navigate to="/" replace />} />
